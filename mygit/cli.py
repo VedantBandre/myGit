@@ -6,6 +6,7 @@ import textwrap
 
 from . import base
 from . import data
+from . import diff
 
 
 def main():
@@ -47,6 +48,14 @@ def parse_args():
     log_parser.set_defaults(func=log)
     log.parser.add_argument('oid', default='@', type=oid, nargs='?')
 
+    show_parser = commands.add_parser('show')
+    show_parser.set_defaults(func=show)
+    show_parser.add_argument('oid', default='@', type=oid, nargs='?')
+
+    diff_parser = commands.add_parser('diff')
+    diff_parser.set_defaults(func=_diff)
+    diff_parse.add_argument('commit', default='@', type=oid, nargs='?')
+
     checkout_parser = commands.add_parser('checkout')
     checkout_parser.set_defaults(func=checkout)
     checkout_parser.add_argument('commit')
@@ -58,14 +67,18 @@ def parse_args():
 
     branch_parser = commands.add_parser('branch')
     branch_parse.set_defaults(func=branch)
-    branch_parser.add_argument('name')
+    branch_parser.add_argument('name', nargs='?')
     branch_parser.add_argument('start_point', default='@', type=oid, nargs='?')
 
     k_parser = commands.add_parser('k')
     k_parser.set_defaults(func=k)
 
-    status_parser = commands.add_parser('status')
-    status_parser.set_defaults(func=status)
+    status_parser = commands.add_parser ('status')
+    status_parser.set_defaults (func=status)
+
+    reset_parser = commands.add_parser ('reset')
+    reset_parser.set_defaults (func=reset)
+    reset_parser.add_argument ('commit', type=oid)
 
     return parser.parse_args()
 
@@ -97,13 +110,43 @@ def commit(args):
     print(base.commit(args.message))
 
 
-def log(args):
-    for oid in base.iter_commits_and_parents({args.oid}):
-        commit = base.get_commit(oid)
+def _print_commit(oid, commit, refs=None):
+    refs_str = f' ({", ".join(refs)})' if refs else ''
+    print(f'commit {oid}{refs_str}\n')
+    print(textwrap.indent(commit.message, '     '))
+    print('')
 
-        print(f'commit {oid}\n')
-        print(textwrap.indent(commit.message, '     '))
-        print('')
+
+def log (args):
+    refs = {}
+    for refname, ref in data.iter_refs ():
+        refs.setdefault (ref.value, []).append (refname)
+
+    for oid in base.iter_commits_and_parents ({args.oid}):
+        commit = base.get_commit (oid)
+        _print_commit(oid, commit, refs.get(oid))
+
+
+def show(args):
+    if not args.oid:
+        return
+    commit = base.get_commit(args.oid)
+    parent_tree = None
+    if commit.parent:
+        parent_tree = base.get_commit(commit.parent).tree
+    _print_commit(args.oid, commit)
+    result = diff.diff_trees(
+        base.get_tree(parent_tree), base.get_tree(commit.tree))
+    sys.stdout.flush()
+    sys.stdout.buffer.write(result)
+
+
+def _diff(args):
+    tree = args.commit and base.get_commit(args.commit).tree
+
+    result = diff.diff_trees(base.get_tree(trees), base.get_working_tree())
+    sys.stdout.flush()
+    sys.stdout.buffer.write(result)
 
 
 def checkout(args):
@@ -116,8 +159,14 @@ def tag(args):
 
 
 def branch(args):
-    base.create_branch(args.name, args.start_point)
-    print(f'Branch {args.name} created at {args.start_point[:10]}')
+    if not args.name:
+        current = base.get_branch_name()
+        for branch in base.iter_branch_names():
+            prefix = '*' if branch == current else ' '
+            print(f'{prefix} {branch}')
+    else:
+        base.create_branch(args.name, args.start_point)
+        print(f'Branch {args.name} created at {args.start_point[:10]}')
 
 
 def k(args):
@@ -135,7 +184,7 @@ def k(args):
         dot += f'"{oid}" [shape=box style=filled label="{oid[:10]}"]\n'
         if commit.parent:
             dot += f'"{oid}" -> "{commit.parent}"\n'
-        
+
     dot += '}'
     print(dot)
     
