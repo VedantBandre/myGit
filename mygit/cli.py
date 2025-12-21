@@ -49,12 +49,17 @@ def parse_args():
 
     checkout_parser = commands.add_parser('checkout')
     checkout_parser.set_defaults(func=checkout)
-    checkout_parser.add_argument('oid', type=oid)
+    checkout_parser.add_argument('commit')
 
     tag_parser = commands.add_parser('tag')
     tag_parser.set_defaults(func=tag)
     tag_parser.add_argument('name')
     tag_parser.add_argument('oid', default='@', type=oid, nargs='?')
+
+    branch_parser = commands.add_parser('branch')
+    branch_parse.set_defaults(func=branch)
+    branch_parser.add_argument('name')
+    branch_parser.add_argument('start_point', default='@', type=oid, nargs='?')
 
     k_parser = commands.add_parser('k')
     k_parser.set_defaults(func=k)
@@ -63,7 +68,7 @@ def parse_args():
 
 
 def init(args):
-    data.init()
+    base.init()
     print(f'Initialized empty mygit repository in {os.getcwd()}/{data.GIT_DIR}')
 
 
@@ -90,10 +95,6 @@ def commit(args):
 
 
 def log(args):
-    refs = {}
-    for refname, ref in data.iter_refs():
-        refs.setdefault(ref.value, []).append(refname)
-    
     for oid in base.iter_commits_and_parents({args.oid}):
         commit = base.get_commit(oid)
 
@@ -102,11 +103,9 @@ def log(args):
         print(textwrap.indent(commit.message, '     '))
         print('')
 
-        oid = commit.parent
-
 
 def checkout(args):
-    base.checkout(args.oid)
+    base.checkout(args.commit)
 
 
 def tag(args):
@@ -114,14 +113,20 @@ def tag(args):
     base.create_tag(args.name, oid)
 
 
+def branch(args):
+    base.create_branch(args.name, args.start_point)
+    print(f'Branch {args.name} created at {args.start_point[:10]}')
+
+
 def k(args):
     dot = 'digraph commits {\n'
     
     oids = set()
-    for refname, ref in data.iter_refs():
+    for refname, ref in data.iter_refs(deref=False):
         dot += f'"{refname}" [shape=note]\n'
-        dot += f'"{refname}" -> "{ref}"\n'
-        oids.add(ref)
+        dot += f'"{refname}" -> "{ref.value}"\n'
+        if not ref.symbolic:
+            oids.add(ref.value)
     
     for oid in base.iter_commits_and_parents(oids):
         commit = base.get_commit(oid)
