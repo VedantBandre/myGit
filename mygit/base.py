@@ -127,6 +127,12 @@ def checkout(name):
     
     data.update_ref('HEAD', HEAD, deref=False)
 
+def reset(oid):
+    data.update_ref('HEAD', data.RefValue(symbolic=False, value=oid))
+
+def merge(other):
+    # TODO merge HEAD into other
+    pass
 
 def create_tag(name, old):
     data.update_ref(f'refs/tags/{name}', data.RefValue(symbolic=False, value=oid))
