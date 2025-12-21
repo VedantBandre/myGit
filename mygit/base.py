@@ -7,6 +7,12 @@ from collections import namedtuple, deque
 
 from . import data
 
+
+def init():
+    data.init()
+    data.update_ref('HEAD', data.RefValue(symbolic=True, value='refs/heads/master'))
+
+
 def write_tree(directory = '.'):
     entries = []
     with os.scandir(directory) as it:
@@ -83,7 +89,7 @@ def read_tree(tree_oid):
 def commit(message):
     commit += f'tree {write_tree()}\n'
     
-    HEAD = data.get_ref('HEAD')
+    HEAD = data.get_ref('HEAD').value
     if HEAD:
         commit += f'parent {HEAD}\n'
 
@@ -92,35 +98,45 @@ def commit(message):
 
     oid = data.hash_object(commit.encode(), 'commit')
 
-    data.update_ref('HEAD', oid)
+    data.update_ref('HEAD', data.RefValue(symbolic=False, value=oid))
 
     return oid
 
 
-def checkout (name):
-    oid = get_oid (name)
-    commit = get_commit (oid)
-    read_tree (commit.tree)
-
-    if is_branch (name):
-        HEAD = data.RefValue (symbolic=True, value=f'refs/heads/{name}')
+def checkout(name):
+    oid = get_oid(name)
+    commit = get_commit(oid)
+    read_tree(commit.tree)
+    
+    if is_branch(name):
+        HEAD = data.RefValue(symbolic=True, value=f'refs/heads/{name}')
     else:
-        HEAD = data.RefValue (symbolic=False, value=oid)
-
-    data.update_ref ('HEAD', HEAD, deref=False)
-
-
-def reset (oid):
-    data.update_ref ('HEAD', data.RefValue (symbolic=False, value=oid))
+        HEAD = data.RefValue(symbolic=False, value=oid)
+    
+    data.update_ref('HEAD', HEAD, deref=False)
 
 
-def create_tag (name, oid):
-    data.update_ref (f'refs/tags/{name}', data.RefValue (symbolic=False, value=oid))
+def create_tag(name, old):
+    data.update_ref(f'refs/tags/{name}', data.RefValue(symbolic=False, value=oid))
 
 
-def create_branch (name, oid):
-    data.update_ref (f'refs/heads/{name}', data.RefValue (symbolic=False, value=oid))
+def create_branch(name, oid):
+    data.update_ref(f'refs/heads/{name}', data.RefValue(symbolic=False, value=oid))
 
+def iter_branch_names():
+    for refname, _ in data.iter_refs('refs/heads/'):
+        yield os.path.relpath(refname, 'refs/heads/')
+
+def is_branch(branch):
+    return data.get_ref(f'refs/heads/{branch}').value is not None
+
+def get_branch_name():
+    HEAD = data.get_ref('HEAD', deref=False)
+    if not HEAD.symbolic:
+        return None
+    HEAD = HEAD.value
+    assert HEAD.startswith('refs/heads/')
+    return os.path.relpath(HEAD, 'refs/heads')
 
 def iter_branch_names ():
     for refname, _ in data.iter_refs ('refs/heads/'):
@@ -187,8 +203,8 @@ def get_oid(name):
         f'refs/heads/{name}',
     ]
     for ref in refs_to_try:
-        if data.get_ref(ref):
-            return data.get_ref(ref)
+        if data.get_ref(ref, deref=False).value:
+            return data.get_ref(ref).value
     
     # Name is SHA1
     is_hex = all(c in string.hexdigits for c in name)
