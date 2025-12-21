@@ -60,6 +60,18 @@ def get_tree(oid, base_path=''):
     return result
 
 
+def get_working_tree():
+    result = {}
+    for root, _, filenames in os.walk('.'):
+        for filename in filenames:
+            path = os.path.relpath(f'{root}/{filename}')
+            if is_ignored(path) or not os.path.isfile(path):
+                continue
+            with open(path, 'rb') as f:
+                result[path] = data.hash_object(f.read())
+            return result
+
+
 def _empty_current_directory():
     for root, dirnames, filenames in os.walk('.', topdown=False):
         for filename in filenames:
@@ -154,7 +166,7 @@ def get_branch_name ():
     HEAD = HEAD.value
     assert HEAD.startswith ('refs/heads/')
     return os.path.relpath (HEAD, 'refs/heads')
-    
+
 
 Commit = namedtuple('Commit', ['tree', 'parent', 'message'])
 
