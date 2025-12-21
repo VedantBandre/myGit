@@ -80,6 +80,10 @@ def parse_args():
     reset_parser.set_defaults (func=reset)
     reset_parser.add_argument ('commit', type=oid)
 
+    merge_parser = commands.add_parser('merge')
+    merge_parser.set_defaults(func=merge)
+    merge_parser.add_argument('commit', type=oid)
+
     return parser.parse_args()
 
 
@@ -199,11 +203,13 @@ def status(args):
         print(f'On branch {branch}')
     else:
         print(f'HEAD detached at {HEAD[:10]}')
-
-    print('\nChanges to be commited:\n')
+    print('\nChanges to be committedL\n')
     HEAD_tree = HEAD and base.get_commit(HEAD).tree
     for path, action in diff.iter_changed_files(base.get_tree(HEAD_tree), base.get_working_tree()):
-        print(f'{action:12> {path}}')
+        print(f'{action:>12}: {path}')
 
 def reset(args):
     base.reset(args.commit)
+
+def merge(args):
+    base.merge(args.commit)
