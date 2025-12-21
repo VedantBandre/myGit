@@ -1,6 +1,8 @@
 import os
 import hashlib
 
+from collections import namedtuple
+
 GIT_DIR = '.mygit'
 
 
@@ -8,19 +10,39 @@ def init():
     os.makedirs(GIT_DIR)
     os.makedirs(f'{GIT_DIR}/objects')
 
+RefValue = namedtuple('RefValue', ['symbolic', 'value'])
 
-def update_ref(ref, oid):
+def update_ref(ref, value, deref=True):
+    ref = _get_ref_internal(ref, deref)[0]
+    
+    assert value.value
+    if value.symbolic:
+        value = f'ref: {value.value}'
+    else:
+         value = value.value
+    
     ref_path = f'{GIT_DIR}/{ref}'
     os.makedirs(os.path.dirname(ref_path), exist_ok=True)
     with open(ref_path, 'w') as f:
-        f.write(oid)
+        f.write(value)
 
+def get_ref(ref, deref):
+    return _get_ref_internal(ref)[1]
 
-def get_ref(ref):
+def _get_ref_internal(ref, deref):
     ref_path = f'{GIT_DIR}/{ref}'
+    value = None
     if os.path.isfile(ref_path):
         with open(ref_path) as f:
-            return f.read().strip()
+            value = f.read().strip()
+    
+    symbolic = bool(value) and value.startswith('ref:')
+    if symbolic:
+        value = value.split(':', 1)[1].strip()
+        if deref:
+            return _get_ref_internal(value, deref=True)
+    
+    return ref, RefValue(symbolic=symbolic, value=value)
 
 
 def iter_refs(prefix='', deref=True):
