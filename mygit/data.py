@@ -23,14 +23,16 @@ def get_ref(ref):
             return f.read().strip()
 
 
-def iter_refs():
+def iter_refs(prefix='', deref=True):
     refs = ['HEAD']
     for root, _, filenames in os.walk(f'{GIT_DIR}/refs/'):
         root = os.path.relpath(root, GIT_DIR)
         refs.extend(f'{root}/{name}' for name in filenames)
     
     for refname in refs:
-        yield refname, get_ref(refname)
+        if not refname.startswith(prefix):
+            continue
+        yield refname, get_ref(refname, deref=deref)
 
 
 def hash_object(data, type_='blob'):

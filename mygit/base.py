@@ -110,6 +110,9 @@ def create_tag(name, old):
 def create_branch(name, oid):
     data.update_ref(f'refs/heads/{name}', oid)
 
+def iter_branch_names():
+    for refname, _ in data.iter_refs('refs/heads/'):
+        yield os.path.relpath(refname, 'refs/heads/')
 
 Commit = namedtuple('Commit', ['tree', 'parent', 'message'])
 
