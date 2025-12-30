@@ -140,8 +140,10 @@ def checkout(name):
     
     data.update_ref('HEAD', HEAD, deref=False)
 
+
 def reset(oid):
     data.update_ref('HEAD', data.RefValue(symbolic=False, value=oid))
+
 
 def merge(other):
     HEAD = data.get_ref('HEAD').value
@@ -154,6 +156,15 @@ def merge(other):
     read_tree_merged(c_HEAD.tree, c_other.tree)
     print('Merged in working tree\nPlease commit')
 
+
+def get_merge_base(oid1, oid2):
+    parents1 = set(iter_commits_and_parents({oid1}))
+
+    for oid in iter_commits_and_parents({oid2}):
+        if oid in parents1:
+            return oid
+
+
 def create_tag(name, old):
     data.update_ref(f'refs/tags/{name}', data.RefValue(symbolic=False, value=oid))
 
@@ -161,12 +172,15 @@ def create_tag(name, old):
 def create_branch(name, oid):
     data.update_ref(f'refs/heads/{name}', data.RefValue(symbolic=False, value=oid))
 
+
 def iter_branch_names():
     for refname, _ in data.iter_refs('refs/heads/'):
         yield os.path.relpath(refname, 'refs/heads/')
 
+
 def is_branch(branch):
     return data.get_ref(f'refs/heads/{branch}').value is not None
+
 
 def get_branch_name():
     HEAD = data.get_ref('HEAD', deref=False)
@@ -175,6 +189,7 @@ def get_branch_name():
     HEAD = HEAD.value
     assert HEAD.startswith('refs/heads/')
     return os.path.relpath(HEAD, 'refs/heads')
+
 
 def iter_branch_names ():
     for refname, _ in data.iter_refs ('refs/heads/'):
