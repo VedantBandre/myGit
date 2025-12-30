@@ -21,12 +21,12 @@ def update_ref(ref, value, deref=True):
     if value.symbolic:
         value = f'ref: {value.value}'
     else:
-         value = value.value
-    
+        value = value.value
+
     ref_path = f'{GIT_DIR}/{ref}'
-    os.makedirs(os.path.dirname(ref_path), exist_ok=True)
-    with open(ref_path, 'w') as f:
-        f.write(value)
+    os.makedirs (os.path.dirname (ref_path), exist_ok=True)
+    with open (ref_path, 'w') as f:
+        f.write (value)
 
 
 def get_ref(ref, deref=True):
@@ -38,21 +38,21 @@ def delete_ref (ref, deref=True):
     os.remove (f'{GIT_DIR}/{ref}')
 
 
-def _get_ref_internal(ref, deref):
+
+def _get_ref_internal (ref, deref):
     ref_path = f'{GIT_DIR}/{ref}'
     value = None
-    if os.path.isfile(ref_path):
-        with open(ref_path) as f:
-            value = f.read().strip()
-    
-    symbolic = bool(value) and value.startswith('ref:')
-    if symbolic:
-        value = value.split(':', 1)[1].strip()
-        if deref:
-            return _get_ref_internal(value, deref=True)
-    
-    return ref, RefValue(symbolic=symbolic, value=value)
+    if os.path.isfile (ref_path):
+        with open (ref_path) as f:
+            value = f.read ().strip ()
 
+    symbolic = bool (value) and value.startswith ('ref:')
+    if symbolic:
+        value = value.split (':', 1)[1].strip ()
+        if deref:
+            return _get_ref_internal (value, deref=True)
+
+    return ref, RefValue (symbolic=symbolic, value=value)
 
 def iter_refs(deref=True):
     refs = ['HEAD', 'MERGE_HEAD']
