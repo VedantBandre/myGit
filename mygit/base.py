@@ -8,7 +8,6 @@ from collections import namedtuple, deque
 from . import data
 from . import diff
 
-
 def init():
     data.init()
     data.update_ref('HEAD', data.RefValue(symbolic=True, value='refs/heads/master'))
@@ -99,9 +98,9 @@ def read_tree(tree_oid):
             f.write(data.get_object(oid))
 
 
-def read_tree_merged(t_base, t_HEAD, t_other):
+def read_tree_merged(t_HEAD, t_other):
     _empty_current_directory()
-    for path, blob in diff.merge_trees(get_tree(t_base), get_tree(t_HEAD), get_tree(t_other)).items():
+    for path, blob in diff.merge_trees(get_tree(t_HEAD), get_tree(t_other)).items ():
         os.makedirs(f'./{os.path.dirname(path)}', exist_ok=True)
         with open(path, 'wb') as f:
             f.write(blob)
@@ -113,10 +112,6 @@ def commit(message):
     HEAD = data.get_ref('HEAD').value
     if HEAD:
         commit += f'parent {HEAD}\n'
-    MERGE_HEAD = data.get_ref('MERGE_HEAD').value
-    if MERGE_HEAD:
-        commit += f'parent {MERGE_HEAD}\n'
-        data.delete_ref('MERGE_HEAD', deref=False)
 
     commit += '\n'
     commit += f'{message}\n'
@@ -148,21 +143,12 @@ def reset(oid):
 def merge(other):
     HEAD = data.get_ref('HEAD').value
     assert HEAD
-    merge_base = get_merge_base(other, HEAD)
+    c_HEAD = get_commit(HEAD)
     c_other = get_commit(other)
 
-    # Handling Fast-Forward Merge
-    if merge_base == HEAD:
-        read_tree(c_other.tree)
-        data.update_ref('HEAD', data.RefValue(symbolic=False, value=other))
-        print('Fast-forward merge, no need to commit')
-        return
-    
-    data.update_ref('MERGE_HEAD', data.RefValue(sybmolic=False, value=other))
+    data.update_ref('MERGE_HEAD', data.RefValue(symbolic=False, value=other))
 
-    c_base = get_commit(merge_base)
-    c_HEAD = get_commit(HEAD) 
-    read_tree_merged(c_base.tree, c_HEAD.tree, c_other.tree)
+    read_tree_merged(c_HEAD.tree, c_other.tree)
     print('Merged in working tree\nPlease commit')
 
 
@@ -218,7 +204,7 @@ def get_commit(oid):
             assert False, f'Unknown field {key}'
 
     message = '\n'.join(lines)
-    return Commit(tree=tree, parents=parents, message=message)
+    return Commit(tree=tree, parent=parent, message=message)
 
 
 def iter_commits_and_parents(oids):
@@ -230,13 +216,13 @@ def iter_commits_and_parents(oids):
         if not oid or oid in visited:
             continue
         visited.add(oid)
-        yield oid
+        yield(oid)
 
         commit = get_commit(oid)
         # Return first parent next
-        oids.extendleft(commit.parents[:1])
+        oids.extendleft (commit.parents[:1])
         # Return other parents later
-        oids.extend(commit.parents[1:])
+        oids.extend (commit.parents[1:])
 
 
 def get_oid(name):
