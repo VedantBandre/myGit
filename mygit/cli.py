@@ -136,8 +136,8 @@ def show(args):
         return
     commit = base.get_commit(args.oid)
     parent_tree = None
-    if commit.parent:
-        parent_tree = base.get_commit(commit.parent).tree
+    if commit.parents:
+        parent_tree = base.get_commit(commit.parents[0]).tree
     _print_commit(args.oid, commit)
     result = diff.diff_trees(
         base.get_tree(parent_tree), base.get_tree(commit.tree))
@@ -186,8 +186,8 @@ def k(args):
     for oid in base.iter_commits_and_parents(oids):
         commit = base.get_commit(oid)
         dot += f'"{oid}" [shape=box style=filled label="{oid[:10]}"]\n'
-        if commit.parent:
-            dot += f'"{oid}" -> "{commit.parent}"\n'
+        for parent in commit.parents:
+            dot += f'"{oid}" -> "{parent}"\n'
 
     dot += '}'
     print(dot)
@@ -203,6 +203,11 @@ def status(args):
         print(f'On branch {branch}')
     else:
         print(f'HEAD detached at {HEAD[:10]}')
+
+    MERGE_HEAD = data.get_ref('MERGE_HEAD').value
+    if MERGE_HEAD:
+        print(f'Merging with {MERGE_HEAD[:10]}')
+
     print('\nChanges to be committedL\n')
     HEAD_tree = HEAD and base.get_commit(HEAD).tree
     for path, action in diff.iter_changed_files(base.get_tree(HEAD_tree), base.get_working_tree()):
