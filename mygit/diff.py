@@ -5,6 +5,7 @@ from tempfile import NamedTemporaryFile as Temp
 
 from . import data
 
+
 def compare_trees(*trees):
     entries = defaultdict(lambda: [None] * len(trees))
     for i, tree in enumerate(trees):

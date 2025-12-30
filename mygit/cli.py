@@ -92,7 +92,6 @@ def parse_args():
     merge_base_parser.add_argument('commit1', type=oid)
     merge_base_parser.add_argument('commit2', type=oid)
 
-
     fetch_parser = commands.add_parser('fetch')
     fetch_parser.set_defaults(func=fetch)
     fetch_parser.add_argument('remote')
