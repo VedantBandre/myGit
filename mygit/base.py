@@ -98,20 +98,34 @@ def _empty_current_directory():
                 pass
 
 
-def read_tree(tree_oid):
-    _empty_current_directory()
-    for path, oid in get_tree(tree_oid, base_path='./').items():
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'wb') as f:
-            f.write(data.get_object(oid))
+def read_tree(tree_oid, update_working=False):
+    with data.get_index() as index:
+        index.clear()
+        index.update(get_tree(tree_oid))
+
+        if update_working:
+            _checkout_index(index)
 
 
-def read_tree_merged(t_HEAD, t_other):
+def read_tree_merged(t_base, t_HEAD, t_other, update_working=False):
+    with data.get_index() as index:
+        index.clear()
+        index.update(diff.merge_trees(
+            get_tree(t_base),
+            get_tree(t_HEAD),
+            get_tree(t_other)
+        ))
+
+        if update_working:
+            _checkout_index(index)
+
+
+def _checkout_index(index):
     _empty_current_directory()
-    for path, blob in diff.merge_trees(get_tree(t_HEAD), get_tree(t_other)).items ():
-        os.makedirs(f'./{os.path.dirname(path)}', exist_ok=True)
+    for path, oid in index.items():
+        os.makedirs(os.path.dirname(f'./{path}'), exist_ok=True)
         with open(path, 'wb') as f:
-            f.write(blob)
+            f.write(data.get_object(oid, 'blob'))
 
 
 def commit(message):
@@ -134,7 +148,7 @@ def commit(message):
 def checkout(name):
     oid = get_oid(name)
     commit = get_commit(oid)
-    read_tree(commit.tree)
+    read_tree(commit.tree, update_working=True)
     
     if is_branch(name):
         HEAD = data.RefValue(symbolic=True, value=f'refs/heads/{name}')
@@ -151,12 +165,19 @@ def reset(oid):
 def merge(other):
     HEAD = data.get_ref('HEAD').value
     assert HEAD
-    c_HEAD = get_commit(HEAD)
+    merge_base = get_merge_base(other, HEAD)
     c_other = get_commit(other)
 
-    data.update_ref('MERGE_HEAD', data.RefValue(symbolic=False, value=other))
+    # Handle fast-forward merge
+    if merge_base == HEAD:
+        read_tree(c_other.tree, update_working=True)
+        data.update_ref('HEAD', data.RefValue(symbolic=False, value=other))
+        print('Fast-forward merge, no need to commit')
+        return
 
-    read_tree_merged(c_HEAD.tree, c_other.tree)
+    c_base = get_commit(merge_base)
+    c_HEAD = get_commit(HEAD)
+    read_tree_merged(c_base.tree, c_HEAD.tree, c_other.tree, update_working=True)
     print('Merged in working tree\nPlease commit')
 
 
