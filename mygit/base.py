@@ -9,12 +9,6 @@ from . import data
 from . import diff
 
 
-def init ():
-    data.init ()
-    data.update_ref ('HEAD', data.RefValue (symbolic=True, value='refs/heads/master'))
-
-
-
 def init():
     data.init()
     data.update_ref('HEAD', data.RefValue(symbolic=True, value='refs/heads/master'))
@@ -115,9 +109,9 @@ def read_tree(tree_oid):
             f.write(data.get_object(oid))
 
 
-def read_tree_merged(t_HEAD, t_other):
+def read_tree_merged(t_base, t_HEAD, t_other):
     _empty_current_directory()
-    for path, blob in diff.merge_trees(get_tree(t_HEAD), get_tree(t_other)).items():
+    for path, blob in diff.merge_trees(get_tree(t_base), get_tree(t_HEAD), get_tree(t_other)).items():
         os.makedirs(f'./{os.path.dirname(path)}', exist_ok=True)
         with open(path, 'wb') as f:
             f.write(blob)
@@ -129,6 +123,10 @@ def commit(message):
     HEAD = data.get_ref('HEAD').value
     if HEAD:
         commit += f'parent {HEAD}\n'
+    MERGE_HEAD = data.get_ref('MERGE_HEAD').value
+    if MERGE_HEAD:
+        commit += f'parent {MERGE_HEAD}\n'
+        data.delete_ref('MERGE_HEAD', deref=False)
 
     commit += '\n'
     commit += f'{message}\n'
@@ -152,12 +150,39 @@ def checkout(name):
     
     data.update_ref('HEAD', HEAD, deref=False)
 
+
 def reset(oid):
     data.update_ref('HEAD', data.RefValue(symbolic=False, value=oid))
 
+
 def merge(other):
-    # TODO merge HEAD into other
-    pass
+    HEAD = data.get_ref('HEAD').value
+    assert HEAD
+    merge_base = get_merge_base(other, HEAD)
+    c_other = get_commit(other)
+
+    # Handling Fast-Forward Merge
+    if merge_base == HEAD:
+        read_tree(c_other.tree)
+        data.update_ref('HEAD', data.RefValue(symbolic=False, value=other))
+        print('Fast-forward merge, no need to commit')
+        return
+    
+    data.update_ref('MERGE_HEAD', data.RefValue(sybmolic=False, value=other))
+
+    c_base = get_commit(merge_base)
+    c_HEAD = get_commit(HEAD) 
+    read_tree_merged(c_base.tree, c_HEAD.tree, c_other.tree)
+    print('Merged in working tree\nPlease commit')
+
+
+def get_merge_base(oid1, oid2):
+    parents1 = set(iter_commits_and_parents({oid1}))
+
+    for oid in iter_commits_and_parents({oid2}):
+        if oid in parents1:
+            return oid
+
 
 
 def reset (oid):
@@ -183,12 +208,15 @@ def create_tag(name, oid):
 def create_branch(name, oid):
     data.update_ref(f'refs/heads/{name}', data.RefValue(symbolic=False, value=oid))
 
+
 def iter_branch_names():
     for refname, _ in data.iter_refs('refs/heads/'):
         yield os.path.relpath(refname, 'refs/heads/')
 
+
 def is_branch(branch):
     return data.get_ref(f'refs/heads/{branch}').value is not None
+
 
 def get_branch_name():
     HEAD = data.get_ref('HEAD', deref=False)
@@ -197,6 +225,7 @@ def get_branch_name():
     HEAD = HEAD.value
     assert HEAD.startswith('refs/heads/')
     return os.path.relpath(HEAD, 'refs/heads')
+
 
 def iter_branch_names ():
     for refname, _ in data.iter_refs ('refs/heads/'):
